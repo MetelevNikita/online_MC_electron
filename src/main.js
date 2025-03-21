@@ -1,4 +1,4 @@
-const { app, BrowserWindow, webContents } = require('electron');
+const { app, BrowserWindow } = require('electron');
 const { dialog, ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('fs');
@@ -42,19 +42,6 @@ const createWindow = () => {
   });
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
-
-
-  ipcMain.on('startConversion', async (event, data) => {
-    const info = data
-    const files = fs.readdirSync(info.input);
-
-    converFile(files, data).then(() => {
-      console.log('All files converted')
-    })
-
-  })
-
-
 
 };
 
@@ -111,6 +98,19 @@ ipcMain.handle('dialog:selectLogo', async (event, arg) => {
   return null
 })
 
+
+
+
+
+ipcMain.on('startConversion', async (event, data) => {
+  const info = data
+  const files = fs.readdirSync(info.input);
+
+  converFile(files, data).then(() => {
+    console.log('All files converted')
+  })
+
+})
 
 
 
