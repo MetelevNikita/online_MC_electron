@@ -87,14 +87,7 @@ container.appendChild(preferenceBox)
 const startBtn = createButton('start', 'Начать')
 
 
-
-
-
-
 container.appendChild(startBtn)
-
-
-
 
 
 
@@ -157,9 +150,15 @@ selectFormat.addEventListener('change', async (e) => {
 
 startBtn.addEventListener('click', async (e) => {
 
-  let result = ''
+  let renderFile = {}
 
-  const renderFile = {
+  if (inputFolderPath === '' || outputFolderPath === '' || bitrate === '' || format === '') {
+    console.log('Заполните все поля')
+    alert('Заполните все поля')
+    return renderFile = {}
+  }
+
+  renderFile = {
     input: inputFolderPath,
     output: outputFolderPath,
     logo: pathLogo,

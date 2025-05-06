@@ -4,11 +4,11 @@ const path = require('node:path');
 const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
 const ProgressBar = require('electron-progressbar');
-const { exec } = require('node:child_process');
+
 
 
 const logo = path.resolve(__dirname, './logo.png')
-console.log(logo)
+
 
 
 
@@ -75,6 +75,7 @@ ipcMain.handle('dialog:selectInputFolder', async (event, arg) => {
     return result.filePaths[0];
   }
 
+  console.log(result.filePaths)
   return null
 })
 
@@ -85,6 +86,7 @@ ipcMain.handle('dialog:selectOutputFolder', async (event, arg) => {
     return result.filePaths[0];
   }
 
+  console.log(result.filePaths)
   return null
 })
 
@@ -94,6 +96,9 @@ ipcMain.handle('dialog:selectLogo', async (event, arg) => {
   if(!result.canceled) {
     return result.filePaths[0];
   }
+
+
+  console.log(result.filePaths)
 
   return null
 })
@@ -106,9 +111,20 @@ ipcMain.on('startConversion', async (event, data) => {
   const info = data
   const files = fs.readdirSync(info.input);
 
-  converFile(files, data).then(() => {
-    console.log('All files converted')
-  })
+  if (info.input === '' || info.output === '' || info.logo === '' || info.format === '' || info.bitrate === '') {
+    return alert('Необходимо выбрать все поля!')
+  }
+  console.log(info)
+
+  try {
+    await convertFiles(files, data);
+    console.log('All files converted');
+  } catch (error) {
+    console.error('Conversion error:', error);
+    if (progressBar && !progressBar.isCompleted()) {
+      progressBar.setCompleted();
+    }
+  }
 
 })
 
@@ -117,35 +133,121 @@ ipcMain.on('startConversion', async (event, data) => {
 
 // convertation FN
 
-const converFile = async (input, data) => {
+const convertFiles = async (input, data) => {
+
+
+
+
 
   for (let i = 0; i < input.length; i++) {
     const inputParse = path.parse(input[i])
 
     await new Promise((resolve) => {
       console.log(`new convertation ${input[i]}`)
-      const command = ffmpeg(data.input + '/' + input[i]).input(data.logo).videoBitrate(`${data.bitrate}k`).videoCodec('libx264').format(data.format).audioCodec('aac').audioBitrate (128).audioChannels (2).complexFilter(['[1:v] scale=230:-1 [logo]', '[0:v][logo] overlay=W-w-80:H-h-930 [v]']).outputOptions('-map', '[v]', '-map', '0:a')
+
+
+      progressBar = new ProgressBar({
+        indeterminate: false,
+        text: 'Подготовка',
+        detail: 'Ожидаю файл...',
+        maxValue: 100
+      })
+
+
+      if (data.logo === '' || !data.logo) {
+
+      const command = ffmpeg(data.input + '/' + input[i]).videoBitrate(`${data.bitrate}k`).videoCodec('libx264').format(data.format).audioCodec('aac').audioBitrate (128).audioChannels(2)
       .on('start', (commandLine) => {
         console.log(`start convertation: ${commandLine}`);
-        progressBar = new ProgressBar({
-          indeterminate: false,
-          text: 'Подготовка',
-          detail: 'Ожидаю файл...',
-          maxValue: 100
-        })
+
+        if (progressBar && !progressBar.isCompleted()) {
+          progressBar.text = 'Подготовка';
+          progressBar.detail = 'Ожидаю файл...';
+        }
       })
       .on('progress', (progress) => {
         const percentCeil = Math.ceil(progress.percent)
-        progressBar.text = 'Идет кодирование файла'
-        progressBar.value = percentCeil
-        progressBar.detail = `${data.input + '/' + input[i]}: ${percentCeil}%`
-        console.log(`progress: ${percentCeil}%`);
+
+        if (progressBar && !progressBar.isCompleted()) {
+          progressBar.text = 'Идет кодирование файла';
+          progressBar.value = percentCeil;
+          progressBar.detail = `${data.input + '/' + input[i]}: ${percentCeil}%`
+        }
+
+
+
       })
       .on('end', () => {
+
         console.log(`Convertation ${input[i]} end!`);
+
+        if (progressBar && !progressBar.isCompleted()) {
+          progressBar.setCompleted();
+        }
+
         fs.unlinkSync(data.input + '/' + input[i])
+        console.log(`file ${input[i]} deleted`)
+
         resolve();
-      }).save(`${data.output + '/' + inputParse.name}.${data.format}`);
+
+
+      })
+      .on('error', (err) => {
+        console.error('Conversion error:', err.message);
+          if (progressBar && !progressBar.isCompleted()) {
+            progressBar.setCompleted();
+          }
+          reject(err);
+      })
+      .save(`${data.output + '/' + inputParse.name}.${data.format}`)
+      }
+
+
+      const command = ffmpeg(data.input + '/' + input[i]).input(data.logo).videoBitrate(`${data.bitrate}k`).videoCodec('libx264').format(data.format).audioCodec('aac').audioBitrate (128).audioChannels (2).complexFilter(['[1:v] scale=230:-1 [logo]', '[0:v][logo] overlay=W-w-80:H-h-930 [v]']).outputOptions('-map', '[v]', '-map', '0:a')
+      .on('start', (commandLine) => {
+        console.log(`start convertation: ${commandLine}`);
+
+        if (progressBar && !progressBar.isCompleted()) {
+          progressBar.text = 'Подготовка';
+          progressBar.detail = 'Ожидаю файл...';
+        }
+      })
+      .on('progress', (progress) => {
+        const percentCeil = Math.ceil(progress.percent)
+
+        if (progressBar && !progressBar.isCompleted()) {
+          progressBar.text = 'Идет кодирование файла';
+          progressBar.value = percentCeil;
+          progressBar.detail = `${data.input + '/' + input[i]}: ${percentCeil}%`
+        }
+
+
+
+      })
+      .on('end', () => {
+
+        console.log(`Convertation ${input[i]} end!`);
+
+        if (progressBar && !progressBar.isCompleted()) {
+          progressBar.setCompleted();
+        }
+
+        fs.unlinkSync(data.input + '/' + input[i])
+        console.log(`file ${input[i]} deleted`)
+
+        resolve();
+
+
+      })
+      .on('error', (err) => {
+        console.error('Conversion error:', err.message);
+          if (progressBar && !progressBar.isCompleted()) {
+            progressBar.setCompleted();
+          }
+          reject(err);
+      })
+      .save(`${data.output + '/' + inputParse.name}.${data.format}`)
+
 
     })
 
